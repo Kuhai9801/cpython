@@ -112,17 +112,30 @@ def _join_suppressing_interrupt(thread: threading.Thread) -> None:
             pass
 
 
+def _start_sender(send: Callable[[], None]) -> tuple[threading.Thread, threading.Event]:
+    ready = threading.Event()
+
+    def target() -> None:
+        ready.wait()
+        send()
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    return thread, ready
+
+
 def _sync_trial(send: Callable[[], None], iterations: int) -> bool:
     lock = threading.Lock()
-    thread = threading.Thread(target=send)
-    thread.start()
+    thread, ready = _start_sender(send)
     try:
+        ready.set()
         for _ in range(iterations):
             with lock:
                 pass
     except ProbeInterrupt:
         pass
     finally:
+        ready.set()
         _join_suppressing_interrupt(thread)
 
     if lock.locked():
@@ -139,13 +152,14 @@ async def _async_body(lock: asyncio.Lock, iterations: int) -> None:
 
 def _async_trial(send: Callable[[], None], iterations: int) -> bool:
     lock = asyncio.Lock()
-    thread = threading.Thread(target=send)
-    thread.start()
+    thread, ready = _start_sender(send)
     try:
+        ready.set()
         asyncio.run(_async_body(lock, iterations))
     except ProbeInterrupt:
         pass
     finally:
+        ready.set()
         _join_suppressing_interrupt(thread)
 
     if lock.locked():
@@ -181,7 +195,7 @@ def main() -> int:
     if skip:
         results = [
             ProbeResult("known_sync_with_signal_exit", 0, 0, known_issue="gh-148874", skipped=skip),
-            ProbeResult("async_with_signal_exit", 0, 0, skipped=skip),
+            ProbeResult("known_async_with_signal_exit", 0, 0, known_issue="gh-148874", skipped=skip),
         ]
     else:
         try:
@@ -195,11 +209,12 @@ def main() -> int:
                     known_issue="gh-148874",
                 ),
                 _run_trials(
-                    "async_with_signal_exit",
+                    "known_async_with_signal_exit",
                     _async_trial,
                     send,
                     trials=trials,
                     iterations=iterations,
+                    known_issue="gh-148874",
                 ),
             ]
         finally:
