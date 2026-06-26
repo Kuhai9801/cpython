@@ -58,3 +58,21 @@ jobs:
         env:
           CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
         run: ./python Tools/compiler_exec_proofs/mode_compare.py
+
+      - name: Run generated compiler/runtime differential suite
+        run: ./python Tools/compiler_exec_proofs/generated_compare.py
+
+      - name: Run focused compiler/runtime regression tests
+        run: >
+          ./python -m test -j2
+          test_ast
+          test_compile
+          test_compiler_assemble
+          test_compiler_codegen
+          test_dis
+          test_grammar
+          test_lazy_import
+          test_monitoring
+          test_opcodes
+          test_symtable
+          test_trace
