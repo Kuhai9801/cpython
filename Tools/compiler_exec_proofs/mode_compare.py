@@ -595,6 +595,77 @@ CASES: list[Case] = [
         [2] * 8,
     ),
     Case(
+        "float_arg_alias_survives_binary_op_warmup",
+        _body(
+            f"""
+            def f(x):
+                y = x + 1.5
+                return x, y, x
+
+            for _ in range({WARMUP}):
+                f(float(2.0))
+
+            value = float(4.0)
+            print(json.dumps({{"result": [list(f(value)) for _ in range(8)]}}))
+            """
+        ),
+        [[4.0, 5.5, 4.0]] * 8,
+    ),
+    Case(
+        "float_local_alias_survives_binary_op_warmup",
+        _body(
+            f"""
+            def f(value):
+                x = float(value)
+                alias = x
+                y = x + 1.5
+                return alias, y, x
+
+            for _ in range({WARMUP}):
+                f(2.0)
+
+            print(json.dumps({{"result": [list(f(4.0)) for _ in range(8)]}}))
+            """
+        ),
+        [[4.0, 5.5, 4.0]] * 8,
+    ),
+    Case(
+        "float_local_alias_survives_unary_negative_warmup",
+        _body(
+            f"""
+            def f(value):
+                x = float(value)
+                alias = x
+                y = -x
+                return alias, y, x
+
+            for _ in range({WARMUP}):
+                f(2.0)
+
+            print(json.dumps({{"result": [list(f(4.0)) for _ in range(8)]}}))
+            """
+        ),
+        [[4.0, -4.0, 4.0]] * 8,
+    ),
+    Case(
+        "int_local_alias_survives_binary_op_warmup",
+        _body(
+            f"""
+            def f(value):
+                x = int(value)
+                alias = x
+                y = x + 7
+                return alias, y, x
+
+            for _ in range({WARMUP}):
+                f(1000)
+
+            print(json.dumps({{"result": [list(f(2000)) for _ in range(8)]}}))
+            """
+        ),
+        [[2000, 2007, 2000]] * 8,
+    ),
+    Case(
         "real_builtins_len_rebind_after_call_len_warmup",
         _body(
             f"""
