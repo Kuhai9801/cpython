@@ -859,6 +859,22 @@ CASES: list[Case] = [
         ],
     ),
     Case(
+        "tuple_negative_const_index_after_warmup",
+        _body(
+            f"""
+            def f(a, b, c):
+                values = (a, b, c)
+                return values[-1]
+
+            for _ in range({WARMUP}):
+                f("a", "b", "c")
+
+            print(json.dumps({{"result": [f("x", "y", "z") for _ in range(8)]}}))
+            """
+        ),
+        ["z"] * 8,
+    ),
+    Case(
         "dict_known_hash_miss_preserves_side_effect_order",
         _body(
             f"""
@@ -915,6 +931,80 @@ CASES: list[Case] = [
             """
         ),
         [[3, 3, 4, 4], [["pre", 3], ["post", 3], ["pre", 4], ["post", 4]]],
+    ),
+    Case(
+        "dict_default_hash_type_mutation_after_known_hash_warmup",
+        _body(
+            f"""
+            class K:
+                pass
+
+            events = []
+            key = K()
+            d = {{key: "old"}}
+
+            def read():
+                events.append(["read-pre", len(d)])
+                try:
+                    value = d[key]
+                except KeyError:
+                    events.append(["read-miss", len(d)])
+                    return ["miss", len(d)]
+                events.append(["read-hit", value, len(d)])
+                return ["hit", value, len(d)]
+
+            def store(value):
+                events.append(["store-pre", value, len(d)])
+                d[key] = value
+                events.append(["store-post", value, len(d)])
+                return [d[key], len(d)]
+
+            for _ in range({WARMUP}):
+                read()
+                store("old")
+                events.clear()
+
+            before = read()
+            K.__hash__ = lambda self: 42
+            after_read = read()
+            after_store = store("new")
+            final_read = read()
+            same_key_count = sum(1 for current in d if current is key)
+            print(
+                json.dumps(
+                    {{
+                        "result": [
+                            before,
+                            after_read,
+                            after_store,
+                            final_read,
+                            len(d),
+                            same_key_count,
+                            events,
+                        ]
+                    }}
+                )
+            )
+            """
+        ),
+        [
+            ["hit", "old", 1],
+            ["miss", 1],
+            ["new", 2],
+            ["hit", "new", 2],
+            2,
+            2,
+            [
+                ["read-pre", 1],
+                ["read-hit", "old", 1],
+                ["read-pre", 1],
+                ["read-miss", 1],
+                ["store-pre", "new", 1],
+                ["store-post", "new", 2],
+                ["read-pre", 2],
+                ["read-hit", "new", 2],
+            ],
+        ],
     ),
     Case(
         "real_builtins_len_rebind_after_call_len_warmup",
