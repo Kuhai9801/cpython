@@ -62,6 +62,9 @@ jobs:
       - name: Run generated compiler/runtime differential suite
         run: ./python Tools/compiler_exec_proofs/generated_compare.py
 
+      - name: Run trace injection catchability suite
+        run: ./python Tools/compiler_exec_proofs/trace_injection_compare.py
+
       - name: Run focused compiler/runtime regression tests
         run: >
           ./python -m test -j2
