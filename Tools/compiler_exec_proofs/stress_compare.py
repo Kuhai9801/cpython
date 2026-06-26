@@ -239,6 +239,64 @@ CASES: list[Case] = [
         ),
     ),
     Case(
+        "float_equality_narrowing_preserves_negative_zero",
+        _body(
+            f"""
+            import math
+
+            def f(limit, value):
+                out = []
+                for _ in range(limit):
+                    x = value
+                    if x == 0.0:
+                        out.append(math.copysign(1.0, x))
+                    else:
+                        out.append(0.0)
+                return out[-8:]
+
+            print(json.dumps({{"result": f({WARMUP}, -0.0)}}))
+            """
+        ),
+    ),
+    Case(
+        "int_equality_narrowing_preserves_identity",
+        _body(
+            f"""
+            def f(limit):
+                expected = 1000
+                out = []
+                for _ in range(limit):
+                    value = int("1000")
+                    if value == expected:
+                        out.append(value is expected)
+                    else:
+                        out.append("miss")
+                return out[-8:]
+
+            print(json.dumps({{"result": f({WARMUP})}}))
+            """
+        ),
+    ),
+    Case(
+        "str_equality_narrowing_preserves_identity",
+        _body(
+            f"""
+            def f(limit):
+                expected = "not-interned"
+                out = []
+                for _ in range(limit):
+                    value = "".join(["not", "-", "interned"])
+                    if value == expected:
+                        out.append(value is expected)
+                    else:
+                        out.append("miss")
+                return out[-8:]
+
+            print(json.dumps({{"result": f({WARMUP})}}))
+            """
+        ),
+    ),
+    Case(
         "match_args_replacement_inside_hot_loop",
         _body(
             f"""
