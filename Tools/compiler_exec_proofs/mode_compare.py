@@ -595,6 +595,83 @@ CASES: list[Case] = [
         [2] * 8,
     ),
     Case(
+        "call_function_ex_code_replacement_after_warmup",
+        _body(
+            f"""
+            def g(*args):
+                return ["old", args[0]]
+
+            def h(*args):
+                return ["new", args[0]]
+
+            def f(value):
+                return g(*(value,))
+
+            for _ in range({WARMUP}):
+                f("warm")
+
+            g.__code__ = h.__code__
+            print(json.dumps({{"result": [f("live") for _ in range(8)]}}))
+            """
+        ),
+        [["new", "live"]] * 8,
+    ),
+    Case(
+        "callee_return_to_distinct_callers_after_warmup",
+        _body(
+            f"""
+            def g(value):
+                return value + 1
+
+            def caller_a(value):
+                return [g(value), "a"]
+
+            def caller_b(value):
+                return ["b", g(value) * 10]
+
+            for _ in range({WARMUP}):
+                caller_a(1)
+
+            print(json.dumps({{"result": [caller_b(i) for i in range(8)]}}))
+            """
+        ),
+        [["b", 10], ["b", 20], ["b", 30], ["b", 40], ["b", 50], ["b", 60], ["b", 70], ["b", 80]],
+    ),
+    Case(
+        "generator_yield_send_after_for_iter_warmup",
+        _body(
+            f"""
+            def gen():
+                first = yield "first"
+                yield ["second", first]
+
+            def drive_for():
+                out = []
+                for value in gen():
+                    out.append(value)
+                return out
+
+            def drive_send(value):
+                iterator = gen()
+                first = next(iterator)
+                second = iterator.send(value)
+                try:
+                    next(iterator)
+                except StopIteration:
+                    done = True
+                else:
+                    done = False
+                return [first, second, done]
+
+            for _ in range({WARMUP}):
+                drive_for()
+
+            print(json.dumps({{"result": [drive_send(i) for i in range(8)]}}))
+            """
+        ),
+        [["first", ["second", i], True] for i in range(8)],
+    ),
+    Case(
         "float_arg_alias_survives_binary_op_warmup",
         _body(
             f"""
