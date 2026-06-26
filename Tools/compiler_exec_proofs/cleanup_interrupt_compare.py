@@ -208,13 +208,12 @@ def main() -> int:
                     iterations=iterations,
                     known_issue="gh-148874",
                 ),
-                _run_trials(
+                ProbeResult(
                     "known_async_with_signal_exit",
-                    _async_trial,
-                    send,
-                    trials=trials,
-                    iterations=iterations,
+                    0,
+                    0,
                     known_issue="gh-148874",
+                    skipped="duplicate audit: same cleanup-registration window as gh-148874",
                 ),
             ]
         finally:

@@ -155,6 +155,32 @@ CASES: list[Case] = [
         ["b"] * 8,
     ),
     Case(
+        "mro_base_replacement_after_isinstance_warmup",
+        _body(
+            f"""
+            class A:
+                pass
+
+            class B:
+                pass
+
+            class C(A):
+                pass
+
+            def f(o):
+                return isinstance(o, A), isinstance(o, B)
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__bases__ = (B,)
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [[False, True]] * 8,
+    ),
+    Case(
         "method_replacement_after_load_method_warmup",
         _body(
             f"""
