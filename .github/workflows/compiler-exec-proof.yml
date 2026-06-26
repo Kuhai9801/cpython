@@ -76,3 +76,21 @@ jobs:
           test_opcodes
           test_symtable
           test_trace
+
+      - name: Run focused compiler/runtime regression tests without uop optimization
+        env:
+          PYTHON_JIT: "1"
+          PYTHON_UOPS_OPTIMIZE: "0"
+        run: >
+          ./python -m test -j2
+          test_ast
+          test_compile
+          test_compiler_assemble
+          test_compiler_codegen
+          test_dis
+          test_grammar
+          test_lazy_import
+          test_monitoring
+          test_opcodes
+          test_symtable
+          test_trace
