@@ -72,6 +72,11 @@ jobs:
           CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
         run: ./python Tools/compiler_exec_proofs/stress_compare.py
 
+      - name: Run generator frame differential suite
+        env:
+          CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
+        run: ./python Tools/compiler_exec_proofs/generator_frame_compare.py
+
       - name: Run trace injection catchability suite
         run: ./python Tools/compiler_exec_proofs/trace_injection_compare.py
 
