@@ -19,6 +19,7 @@ WARMUP = 800
 class Case:
     name: str
     source: str
+    expected: object | None = None
 
 
 def _body(source: str) -> str:
@@ -51,6 +52,7 @@ CASES: list[Case] = [
             print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
             """
         ),
+        [2] * 8,
     ),
     Case(
         "property_fget_mutation_after_load_attr_warmup",
@@ -72,6 +74,7 @@ CASES: list[Case] = [
             print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
             """
         ),
+        [20] * 8,
     ),
     Case(
         "getattribute_mutation_after_load_attr_warmup",
@@ -96,6 +99,7 @@ CASES: list[Case] = [
             print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
             """
         ),
+        [4] * 8,
     ),
     Case(
         "base_class_descriptor_mutation_after_warmup",
@@ -122,6 +126,180 @@ CASES: list[Case] = [
             print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
             """
         ),
+        ["after"] * 8,
+    ),
+    Case(
+        "mro_base_replacement_after_load_attr_warmup",
+        _body(
+            f"""
+            class A:
+                x = "a"
+
+            class B:
+                x = "b"
+
+            class C(A):
+                pass
+
+            def f(o):
+                return o.x
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__bases__ = (B,)
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        ["b"] * 8,
+    ),
+    Case(
+        "method_replacement_after_load_method_warmup",
+        _body(
+            f"""
+            class C:
+                def m(self):
+                    return 1
+
+            def f(o):
+                return o.m()
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.m = lambda self: 2
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [2] * 8,
+    ),
+    Case(
+        "call_slot_replacement_after_call_warmup",
+        _body(
+            f"""
+            class C:
+                def __call__(self):
+                    return 5
+
+            def f(o):
+                return o()
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__call__ = lambda self: 6
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [6] * 8,
+    ),
+    Case(
+        "len_slot_replacement_after_builtin_call_warmup",
+        _body(
+            f"""
+            class C:
+                def __len__(self):
+                    return 3
+
+            def f(o):
+                return len(o)
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__len__ = lambda self: 4
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [4] * 8,
+    ),
+    Case(
+        "contains_slot_replacement_after_compare_warmup",
+        _body(
+            f"""
+            class C:
+                def __contains__(self, item):
+                    return False
+
+            def f(o):
+                return 1 in o
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__contains__ = lambda self, item: True
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [True] * 8,
+    ),
+    Case(
+        "getitem_slot_replacement_after_subscr_warmup",
+        _body(
+            f"""
+            class C:
+                def __getitem__(self, item):
+                    return item + 1
+
+            def f(o):
+                return o[10]
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__getitem__ = lambda self, item: item + 2
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [12] * 8,
+    ),
+    Case(
+        "binary_slot_replacement_after_binary_op_warmup",
+        _body(
+            f"""
+            class C:
+                def __add__(self, other):
+                    return 1
+
+            def f(o):
+                return o + 10
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__add__ = lambda self, other: 2
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [2] * 8,
+    ),
+    Case(
+        "richcompare_slot_replacement_after_compare_warmup",
+        _body(
+            f"""
+            class C:
+                def __lt__(self, other):
+                    return False
+
+            def f(o):
+                return o < 10
+
+            c = C()
+            for _ in range({WARMUP}):
+                f(c)
+
+            C.__lt__ = lambda self, other: True
+            print(json.dumps({{"result": [f(c) for _ in range(8)]}}))
+            """
+        ),
+        [True] * 8,
     ),
     Case(
         "globals_reexec_with_distinct_builtins",
@@ -148,6 +326,81 @@ CASES: list[Case] = [
             print(json.dumps({{"result": [ns1["out"], ns2["out"]]}}))
             """
         ),
+        [800, 1600],
+    ),
+    Case(
+        "global_shadow_builtin_after_load_global_warmup",
+        _body(
+            f"""
+            def f():
+                return len([1])
+
+            for _ in range({WARMUP}):
+                f()
+
+            len = lambda obj: 7
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+        [7] * 8,
+    ),
+    Case(
+        "global_delete_reveals_builtin_after_load_global_warmup",
+        _body(
+            f"""
+            len = lambda obj: 7
+
+            def f():
+                return len([1])
+
+            for _ in range({WARMUP}):
+                f()
+
+            del len
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+        [1] * 8,
+    ),
+    Case(
+        "builtins_dict_mutation_after_load_global_warmup",
+        _body(
+            f"""
+            src = '''
+            def f():
+                return len([0])
+            '''
+
+            builtins = {{"len": lambda obj: 3}}
+            ns = {{"__builtins__": builtins}}
+            exec(compile(src, "<generated>", "exec"), ns)
+            for _ in range({WARMUP}):
+                ns["f"]()
+
+            builtins["len"] = lambda obj: 4
+            print(json.dumps({{"result": [ns["f"]() for _ in range(8)]}}))
+            """
+        ),
+        [4] * 8,
+    ),
+    Case(
+        "global_function_rebind_after_call_warmup",
+        _body(
+            f"""
+            def g():
+                return 1
+
+            def f():
+                return g()
+
+            for _ in range({WARMUP}):
+                f()
+
+            g = lambda: 2
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+        [2] * 8,
     ),
     Case(
         "cell_rebinding_after_closure_warmup",
@@ -172,6 +425,123 @@ CASES: list[Case] = [
             print(json.dumps({{"result": [f() for _ in range(8)]}}))
             """
         ),
+        [160] * 8,
+    ),
+    Case(
+        "try_finally_continue_break_after_warmup",
+        _body(
+            f"""
+            def f():
+                out = []
+                for i in range(4):
+                    try:
+                        if i == 1:
+                            continue
+                        if i == 2:
+                            break
+                        out.append(("body", i))
+                    finally:
+                        out.append(("finally", i))
+                return out
+
+            for _ in range({WARMUP}):
+                f()
+
+            print(json.dumps({{"result": f()}}))
+            """
+        ),
+        [["body", 0], ["finally", 0], ["finally", 1], ["finally", 2]],
+    ),
+    Case(
+        "nested_exception_finally_control_flow_after_warmup",
+        _body(
+            f"""
+            def f(flag):
+                out = []
+                try:
+                    try:
+                        if flag:
+                            raise ValueError("sentinel")
+                        out.append("body")
+                    except ValueError as exc:
+                        out.append(type(exc).__name__)
+                    finally:
+                        out.append("inner-finally")
+                finally:
+                    out.append("outer-finally")
+                return out
+
+            for _ in range({WARMUP}):
+                f(True)
+
+            print(json.dumps({{"result": f(True)}}))
+            """
+        ),
+        ["ValueError", "inner-finally", "outer-finally"],
+    ),
+    Case(
+        "compile_optimize_equivalence_without_asserts_or_docstrings",
+        _body(
+            """
+            PROGRAMS = [
+                '''
+            result = []
+            for i in range(5):
+                result.append((i, i * i, i % 2 == 0))
+            ''',
+                '''
+            def make(base):
+                def f(delta):
+                    return base + delta
+                return f
+            result = [make(i)(10) for i in range(4)]
+            ''',
+                '''
+            result = []
+            try:
+                raise KeyError("k")
+            except KeyError as exc:
+                result.append(type(exc).__name__)
+            finally:
+                result.append("done")
+            ''',
+                '''
+            class C:
+                x = 4
+                def f(self):
+                    return self.x + 1
+            result = C().f()
+            ''',
+                '''
+            result = []
+            match {"kind": "point", "x": 2, "y": 3}:
+                case {"kind": "point", "x": x, "y": y}:
+                    result.append(x + y)
+                case _:
+                    result.append("miss")
+            ''',
+            ]
+
+            def run(src, optimize):
+                ns = {}
+                code = compile(src, f"<optimize-{optimize}>", "exec", optimize=optimize)
+                exec(code, ns)
+                return ns["result"]
+
+            failures = []
+            for index, src in enumerate(PROGRAMS):
+                values = [run(src, optimize) for optimize in (0, 1, 2)]
+                if values[1:] != values[:1] * 2:
+                    failures.append({"index": index, "values": values})
+
+            if failures:
+                print(json.dumps({"result": failures}))
+                raise SystemExit(1)
+
+            print(json.dumps({"result": "ok"}))
+            """
+        ),
+        "ok",
     ),
     Case(
         "class_scope_same_name_closure_runtime",
@@ -229,6 +599,21 @@ def _normalize(proc: subprocess.CompletedProcess[str]) -> dict[str, object]:
     }
 
 
+def _json_result(proc: subprocess.CompletedProcess[str]) -> object:
+    if proc.returncode != 0:
+        return None
+    lines = proc.stdout.strip().splitlines()
+    if not lines:
+        return None
+    try:
+        payload = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict) or "result" not in payload:
+        return None
+    return payload["result"]
+
+
 def main() -> int:
     case_filter = os.environ.get("CASE_FILTER", "")
     modes = {
@@ -241,18 +626,37 @@ def main() -> int:
         raise SystemExit(f"no cases selected by filter {case_filter!r}")
 
     mismatches: list[dict[str, object]] = []
+    expectation_failures: list[dict[str, object]] = []
     for case in selected:
-        results = {mode: _normalize(_run_case(case, env)) for mode, env in modes.items()}
+        runs = {mode: _run_case(case, env) for mode, env in modes.items()}
+        results = {mode: _normalize(proc) for mode, proc in runs.items()}
         print(f"CASE {case.name}")
         print(json.dumps(results, sort_keys=True))
         baseline = results["tier1"]
         for mode, result in results.items():
             if mode != "tier1" and result != baseline:
                 mismatches.append({"case": case.name, "mode": mode, "baseline": baseline, "result": result})
+        if case.expected is not None:
+            for mode, proc in runs.items():
+                observed = _json_result(proc)
+                if observed != case.expected:
+                    expectation_failures.append(
+                        {
+                            "case": case.name,
+                            "mode": mode,
+                            "expected": case.expected,
+                            "observed": observed,
+                            "raw": results[mode],
+                        }
+                    )
 
-    if mismatches:
-        print("MISMATCHES")
-        print(json.dumps(mismatches, indent=2, sort_keys=True))
+    if mismatches or expectation_failures:
+        if mismatches:
+            print("MISMATCHES")
+            print(json.dumps(mismatches, indent=2, sort_keys=True))
+        if expectation_failures:
+            print("EXPECTATION_FAILURES")
+            print(json.dumps(expectation_failures, indent=2, sort_keys=True))
         return 1
     print("no mismatches")
     return 0
