@@ -203,6 +203,140 @@ CASES: list[Case] = [
         ),
         "ctxpkg.producer",
     ),
+    Case(
+        "lazy_type_alias_reification_replaces_module_global_once",
+        _body(
+            """
+            import json
+            import os
+            import sys
+            import tempfile
+            import textwrap
+
+            files = {
+                "annpkg/__init__.py": "",
+                "annpkg/mod.py": '''
+                    import builtins
+                    import types
+
+                    calls = []
+
+                    def recording_import(name, globals=None, locals=None,
+                                         fromlist=(), level=0):
+                        token = len(calls) + 1
+                        importer = None if globals is None else globals.get("__name__")
+                        calls.append([token, importer])
+                        return types.SimpleNamespace(Type=f"type-{token}")
+
+                    local_builtins = dict(vars(builtins))
+                    local_builtins["__import__"] = recording_import
+                    __builtins__ = local_builtins
+
+                    lazy import target_module as target
+                    type Alias = target.Type
+
+                    def alias_then_global():
+                        alias_value = Alias.__value__
+                        global_value = target.Type
+                        return {
+                            "alias_value": alias_value,
+                            "global_value": global_value,
+                            "calls": calls,
+                        }
+                ''',
+            }
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for relpath, contents in files.items():
+                    path = os.path.join(tmpdir, relpath)
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    with open(path, "w", encoding="utf-8") as file:
+                        file.write(textwrap.dedent(contents).lstrip())
+
+                sys.path.insert(0, tmpdir)
+                try:
+                    import annpkg.mod as mod
+                    result = mod.alias_then_global()
+                finally:
+                    sys.path.remove(tmpdir)
+
+            print(json.dumps({"result": result}, sort_keys=True))
+            """
+        ),
+        {
+            "alias_value": "type-1",
+            "global_value": "type-1",
+            "calls": [[1, "annpkg.mod"]],
+        },
+    ),
+    Case(
+        "lazy_class_annotation_reification_replaces_module_global_once",
+        _body(
+            """
+            import json
+            import os
+            import sys
+            import tempfile
+            import textwrap
+
+            files = {
+                "annpkg/__init__.py": "",
+                "annpkg/mod.py": '''
+                    import builtins
+                    import types
+
+                    calls = []
+
+                    def recording_import(name, globals=None, locals=None,
+                                         fromlist=(), level=0):
+                        token = len(calls) + 1
+                        importer = None if globals is None else globals.get("__name__")
+                        calls.append([token, importer])
+                        return types.SimpleNamespace(Type=f"type-{token}")
+
+                    local_builtins = dict(vars(builtins))
+                    local_builtins["__import__"] = recording_import
+                    __builtins__ = local_builtins
+
+                    lazy import target_module as target
+
+                    class C:
+                        field: target.Type
+
+                    def annotation_then_global():
+                        annotation_value = C.__annotations__["field"]
+                        global_value = target.Type
+                        return {
+                            "annotation_value": annotation_value,
+                            "global_value": global_value,
+                            "calls": calls,
+                        }
+                ''',
+            }
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for relpath, contents in files.items():
+                    path = os.path.join(tmpdir, relpath)
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    with open(path, "w", encoding="utf-8") as file:
+                        file.write(textwrap.dedent(contents).lstrip())
+
+                sys.path.insert(0, tmpdir)
+                try:
+                    import annpkg.mod as mod
+                    result = mod.annotation_then_global()
+                finally:
+                    sys.path.remove(tmpdir)
+
+            print(json.dumps({"result": result}, sort_keys=True))
+            """
+        ),
+        {
+            "annotation_value": "type-1",
+            "global_value": "type-1",
+            "calls": [[1, "annpkg.mod"]],
+        },
+    ),
 ]
 
 
