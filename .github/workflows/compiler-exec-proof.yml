@@ -77,6 +77,11 @@ jobs:
           CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
         run: ./python Tools/compiler_exec_proofs/generator_frame_compare.py
 
+      - name: Run lazy dotted import suite
+        env:
+          CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
+        run: ./python Tools/compiler_exec_proofs/lazy_import_dotted_compare.py
+
       - name: Run lazy import context suite
         env:
           CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
