@@ -244,17 +244,20 @@ CASES: list[Case] = [
             f"""
             import math
 
-            def f(limit, value):
+            def return_negative_zero():
+                return -0.0
+
+            def f(limit):
+                value = return_negative_zero()
                 out = []
                 for _ in range(limit):
-                    x = value
-                    if x == 0.0:
-                        out.append(math.copysign(1.0, x))
+                    if value == 0.0:
+                        out.append(math.copysign(1.0, value))
                     else:
                         out.append(0.0)
                 return out[-8:]
 
-            print(json.dumps({{"result": f({WARMUP}, -0.0)}}))
+            print(json.dumps({{"result": f({WARMUP})}}))
             """
         ),
     ),
@@ -262,11 +265,14 @@ CASES: list[Case] = [
         "int_equality_narrowing_preserves_identity",
         _body(
             f"""
+            def return_thousand():
+                return int("1000")
+
             def f(limit):
                 expected = 1000
+                value = return_thousand()
                 out = []
                 for _ in range(limit):
-                    value = int("1000")
                     if value == expected:
                         out.append(value is expected)
                     else:
@@ -281,11 +287,14 @@ CASES: list[Case] = [
         "str_equality_narrowing_preserves_identity",
         _body(
             f"""
+            def return_string():
+                return "".join(["not", "-", "interned"])
+
             def f(limit):
                 expected = "not-interned"
+                value = return_string()
                 out = []
                 for _ in range(limit):
-                    value = "".join(["not", "-", "interned"])
                     if value == expected:
                         out.append(value is expected)
                     else:
