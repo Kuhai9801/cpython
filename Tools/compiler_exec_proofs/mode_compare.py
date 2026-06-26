@@ -181,6 +181,106 @@ CASES: list[Case] = [
         [[False, True]] * 8,
     ),
     Case(
+        "super_mro_base_replacement_after_warmup",
+        _body(
+            f"""
+            class A:
+                def m(self):
+                    return "a"
+
+            class B:
+                def m(self):
+                    return "b"
+
+            class C(A):
+                def f(self):
+                    return super().m()
+
+            c = C()
+            for _ in range({WARMUP}):
+                c.f()
+
+            C.__bases__ = (B,)
+            print(json.dumps({{"result": [c.f() for _ in range(8)]}}))
+            """
+        ),
+        ["b"] * 8,
+    ),
+    Case(
+        "super_descriptor_replacement_after_warmup",
+        _body(
+            f"""
+            class A:
+                def m(self):
+                    return "before"
+
+            class C(A):
+                def f(self):
+                    return super().m()
+
+            c = C()
+            for _ in range({WARMUP}):
+                c.f()
+
+            A.m = lambda self: "after"
+            print(json.dumps({{"result": [c.f() for _ in range(8)]}}))
+            """
+        ),
+        ["after"] * 8,
+    ),
+    Case(
+        "abc_registration_after_isinstance_warmup",
+        _body(
+            f"""
+            import abc
+
+            class A(metaclass=abc.ABCMeta):
+                pass
+
+            class B:
+                pass
+
+            def f(o):
+                return isinstance(o, A)
+
+            b = B()
+            for _ in range({WARMUP}):
+                f(b)
+
+            A.register(B)
+            print(json.dumps({{"result": [f(b) for _ in range(8)]}}))
+            """
+        ),
+        [True] * 8,
+    ),
+    Case(
+        "instancecheck_replacement_after_isinstance_warmup",
+        _body(
+            f"""
+            class Meta(type):
+                def __instancecheck__(cls, obj):
+                    return False
+
+            class A(metaclass=Meta):
+                pass
+
+            class B:
+                pass
+
+            def f(o):
+                return isinstance(o, A)
+
+            b = B()
+            for _ in range({WARMUP}):
+                f(b)
+
+            Meta.__instancecheck__ = lambda cls, obj: True
+            print(json.dumps({{"result": [f(b) for _ in range(8)]}}))
+            """
+        ),
+        [True] * 8,
+    ),
+    Case(
         "method_replacement_after_load_method_warmup",
         _body(
             f"""
@@ -452,6 +552,71 @@ CASES: list[Case] = [
             """
         ),
         [160] * 8,
+    ),
+    Case(
+        "function_code_replacement_after_call_warmup",
+        _body(
+            f"""
+            def g():
+                return 1
+
+            def h():
+                return 2
+
+            def f():
+                return g()
+
+            for _ in range({WARMUP}):
+                f()
+
+            g.__code__ = h.__code__
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+        [2] * 8,
+    ),
+    Case(
+        "function_defaults_replacement_after_call_warmup",
+        _body(
+            f"""
+            def g(x=1):
+                return x
+
+            def f():
+                return g()
+
+            for _ in range({WARMUP}):
+                f()
+
+            g.__defaults__ = (2,)
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+        [2] * 8,
+    ),
+    Case(
+        "real_builtins_len_rebind_after_call_len_warmup",
+        _body(
+            f"""
+            import builtins
+
+            def f():
+                return len([1, 2, 3])
+
+            for _ in range({WARMUP}):
+                f()
+
+            original_len = builtins.len
+            try:
+                builtins.len = lambda obj: 7
+                result = [f() for _ in range(8)]
+            finally:
+                builtins.len = original_len
+
+            print(json.dumps({{"result": result}}))
+            """
+        ),
+        [7] * 8,
     ),
     Case(
         "try_finally_continue_break_after_warmup",
