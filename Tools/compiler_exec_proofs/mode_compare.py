@@ -666,6 +666,257 @@ CASES: list[Case] = [
         [[2000, 2007, 2000]] * 8,
     ),
     Case(
+        "int_inplace_mixed_rhs_preserves_side_effect_order",
+        _body(
+            f"""
+            events = []
+
+            def mk(kind):
+                events.append(["mk", kind])
+                if kind == "int":
+                    return 3
+                if kind == "bool":
+                    return True
+                if kind == "float":
+                    return 0.5
+                raise AssertionError(kind)
+
+            def f(kinds):
+                x = 1000
+                out = []
+                for kind in kinds:
+                    before = x
+                    x += mk(kind)
+                    out.append([kind, before, x, len(events)])
+                return [x, out]
+
+            for _ in range({WARMUP}):
+                f(["int", "int", "int"])
+                events.clear()
+
+            result = f(["int", "bool", "float", "int"])
+            print(json.dumps({{"result": [result, events]}}))
+            """
+        ),
+        [
+            [
+                1007.5,
+                [
+                    ["int", 1000, 1003, 1],
+                    ["bool", 1003, 1004, 2],
+                    ["float", 1004, 1004.5, 3],
+                    ["int", 1004.5, 1007.5, 4],
+                ],
+            ],
+            [["mk", "int"], ["mk", "bool"], ["mk", "float"], ["mk", "int"]],
+        ],
+    ),
+    Case(
+        "float_inplace_custom_rhs_preserves_side_effect_order",
+        _body(
+            f"""
+            events = []
+
+            class Rhs:
+                def __radd__(self, other):
+                    events.append(["radd", other])
+                    return other + 10.0
+
+            def mk(kind):
+                events.append(["mk", kind])
+                if kind == "float":
+                    return 0.5
+                if kind == "int":
+                    return 2
+                if kind == "custom":
+                    return Rhs()
+                raise AssertionError(kind)
+
+            def f(kinds):
+                x = 1.0
+                out = []
+                for kind in kinds:
+                    before = x
+                    x += mk(kind)
+                    out.append([kind, before, x, len(events)])
+                return [x, out]
+
+            for _ in range({WARMUP}):
+                f(["float", "float", "float"])
+                events.clear()
+
+            result = f(["float", "custom", "int", "float"])
+            print(json.dumps({{"result": [result, events]}}))
+            """
+        ),
+        [
+            [
+                14.0,
+                [
+                    ["float", 1.0, 1.5, 1],
+                    ["custom", 1.5, 11.5, 3],
+                    ["int", 11.5, 13.5, 4],
+                    ["float", 13.5, 14.0, 5],
+                ],
+            ],
+            [["mk", "float"], ["mk", "custom"], ["radd", 1.5], ["mk", "int"], ["mk", "float"]],
+        ],
+    ),
+    Case(
+        "list_subscr_bounds_deopt_preserves_side_effect_order",
+        _body(
+            f"""
+            events = []
+
+            def mark(label, value):
+                events.append([label, value])
+                return value
+
+            def f(indexes):
+                seq = [10, 20, 30]
+                out = []
+                for value in indexes:
+                    try:
+                        item = [mark("pre", value), seq[mark("idx", value)], mark("post", value)]
+                    except Exception as exc:
+                        out.append(["exc", value, type(exc).__name__, len(events)])
+                    else:
+                        out.append(["ok", value, item, len(events)])
+                return out
+
+            for _ in range({WARMUP}):
+                f([1, 1, 1])
+                events.clear()
+
+            result = f([1, 3, 2])
+            print(json.dumps({{"result": [result, events]}}))
+            """
+        ),
+        [
+            [
+                ["ok", 1, [1, 20, 1], 3],
+                ["exc", 3, "IndexError", 5],
+                ["ok", 2, [2, 30, 2], 8],
+            ],
+            [
+                ["pre", 1],
+                ["idx", 1],
+                ["post", 1],
+                ["pre", 3],
+                ["idx", 3],
+                ["pre", 2],
+                ["idx", 2],
+                ["post", 2],
+            ],
+        ],
+    ),
+    Case(
+        "tuple_subscr_bounds_deopt_preserves_side_effect_order",
+        _body(
+            f"""
+            events = []
+
+            def mark(label, value):
+                events.append([label, value])
+                return value
+
+            def f(indexes):
+                seq = (10, 20, 30)
+                out = []
+                for value in indexes:
+                    try:
+                        item = [mark("pre", value), seq[mark("idx", value)], mark("post", value)]
+                    except Exception as exc:
+                        out.append(["exc", value, type(exc).__name__, len(events)])
+                    else:
+                        out.append(["ok", value, item, len(events)])
+                return out
+
+            for _ in range({WARMUP}):
+                f([1, 1, 1])
+                events.clear()
+
+            result = f([1, 3, 2])
+            print(json.dumps({{"result": [result, events]}}))
+            """
+        ),
+        [
+            [
+                ["ok", 1, [1, 20, 1], 3],
+                ["exc", 3, "IndexError", 5],
+                ["ok", 2, [2, 30, 2], 8],
+            ],
+            [
+                ["pre", 1],
+                ["idx", 1],
+                ["post", 1],
+                ["pre", 3],
+                ["idx", 3],
+                ["pre", 2],
+                ["idx", 2],
+                ["post", 2],
+            ],
+        ],
+    ),
+    Case(
+        "dict_known_hash_miss_preserves_side_effect_order",
+        _body(
+            f"""
+            events = []
+
+            def f(d):
+                events.append("pre")
+                try:
+                    value = d["a"]
+                except KeyError:
+                    events.append("miss")
+                    return ["miss"]
+                events.append(["hit", value])
+                return ["hit", value]
+
+            d = {{"a": 1}}
+            alias = d
+            for _ in range({WARMUP}):
+                f(d)
+                events.clear()
+
+            out = [f(d)]
+            del alias["a"]
+            out.append(f(d))
+            alias["a"] = 3
+            out.append(f(d))
+            print(json.dumps({{"result": [out, events]}}))
+            """
+        ),
+        [[["hit", 1], ["miss"], ["hit", 3]], ["pre", ["hit", 1], "pre", "miss", "pre", ["hit", 3]]],
+    ),
+    Case(
+        "dict_known_hash_store_preserves_alias_observation",
+        _body(
+            f"""
+            events = []
+
+            def f(d, value):
+                events.append(["pre", value])
+                d["a"] = value
+                events.append(["post", d["a"]])
+                return d["a"]
+
+            d = {{"a": 1}}
+            alias = d
+            for _ in range({WARMUP}):
+                f(d, 2)
+                events.clear()
+
+            out = [f(d, 3), alias["a"]]
+            del alias["a"]
+            out.extend([f(d, 4), alias["a"]])
+            print(json.dumps({{"result": [out, events]}}))
+            """
+        ),
+        [[3, 3, 4, 4], [["pre", 3], ["post", 3], ["pre", 4], ["post", 4]]],
+    ),
+    Case(
         "real_builtins_len_rebind_after_call_len_warmup",
         _body(
             f"""
