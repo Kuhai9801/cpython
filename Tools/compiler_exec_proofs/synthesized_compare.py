@@ -234,6 +234,53 @@ CASES: list[Case] = [
         ),
     ),
     Case(
+        "isinstance_respects_instance_class_attribute_after_warmup",
+        _body(
+            f"""
+            class C:
+                pass
+
+            class X:
+                @property
+                def __class__(self):
+                    return C
+
+            x = X()
+
+            def f():
+                return isinstance(x, C)
+
+            for _ in range({WARMUP}):
+                f()
+
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+    ),
+    Case(
+        "module_attr_value_mutation_after_load_attr_module_warmup",
+        _body(
+            f"""
+            import types
+
+            m = types.ModuleType("m")
+            m.x = 1
+
+            def f():
+                total = 0
+                for _ in range(80):
+                    total += m.x
+                return total
+
+            for _ in range({WARMUP}):
+                f()
+
+            m.x = 2
+            print(json.dumps({{"result": [f() for _ in range(8)]}}))
+            """
+        ),
+    ),
+    Case(
         "method_function_code_replacement_after_bound_call_warmup",
         _body(
             f"""
