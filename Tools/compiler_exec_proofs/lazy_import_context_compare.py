@@ -40,8 +40,12 @@ CASES: list[Case] = [
                     import builtins
                     import types
 
+                    _real_import = builtins.__import__
+
                     def recording_import(name, globals=None, locals=None,
                                          fromlist=(), level=0):
+                        if name != "target_module":
+                            return _real_import(name, globals, locals, fromlist, level)
                         importer = None if globals is None else globals.get("__name__")
                         return types.SimpleNamespace(
                             importer=importer,
@@ -50,10 +54,7 @@ CASES: list[Case] = [
                             level=level,
                         )
 
-                    local_builtins = dict(vars(builtins))
-                    local_builtins["__import__"] = recording_import
-                    __builtins__ = local_builtins
-
+                    builtins.__import__ = recording_import
                     lazy import target_module as artifact
                 ''',
                 "ctxpkg/consumer.py": '''
@@ -99,8 +100,12 @@ CASES: list[Case] = [
                     import builtins
                     import types
 
+                    _real_import = builtins.__import__
+
                     def recording_import(name, globals=None, locals=None,
                                          fromlist=(), level=0):
+                        if name != "target_module":
+                            return _real_import(name, globals, locals, fromlist, level)
                         importer = None if globals is None else globals.get("__name__")
                         return types.SimpleNamespace(
                             importer=importer,
@@ -109,10 +114,7 @@ CASES: list[Case] = [
                             level=level,
                         )
 
-                    local_builtins = dict(vars(builtins))
-                    local_builtins["__import__"] = recording_import
-                    __builtins__ = local_builtins
-
+                    builtins.__import__ = recording_import
                     lazy import target_module as artifact
                 ''',
                 "ctxpkg/consumer.py": '''
@@ -158,8 +160,12 @@ CASES: list[Case] = [
                     import builtins
                     import types
 
+                    _real_import = builtins.__import__
+
                     def recording_import(name, globals=None, locals=None,
                                          fromlist=(), level=0):
+                        if name != "target_module":
+                            return _real_import(name, globals, locals, fromlist, level)
                         importer = None if globals is None else globals.get("__name__")
                         return types.SimpleNamespace(
                             value=types.SimpleNamespace(
@@ -170,10 +176,7 @@ CASES: list[Case] = [
                             )
                         )
 
-                    local_builtins = dict(vars(builtins))
-                    local_builtins["__import__"] = recording_import
-                    __builtins__ = local_builtins
-
+                    builtins.__import__ = recording_import
                     lazy from target_module import value as artifact
                 ''',
                 "ctxpkg/consumer.py": '''
@@ -220,18 +223,18 @@ CASES: list[Case] = [
                     import types
 
                     calls = []
+                    _real_import = builtins.__import__
 
                     def recording_import(name, globals=None, locals=None,
                                          fromlist=(), level=0):
+                        if name != "target_module":
+                            return _real_import(name, globals, locals, fromlist, level)
                         token = len(calls) + 1
                         importer = None if globals is None else globals.get("__name__")
                         calls.append([token, importer])
                         return types.SimpleNamespace(Type=f"type-{token}")
 
-                    local_builtins = dict(vars(builtins))
-                    local_builtins["__import__"] = recording_import
-                    __builtins__ = local_builtins
-
+                    builtins.__import__ = recording_import
                     lazy import target_module as target
                     type Alias = target.Type
 
@@ -286,18 +289,18 @@ CASES: list[Case] = [
                     import types
 
                     calls = []
+                    _real_import = builtins.__import__
 
                     def recording_import(name, globals=None, locals=None,
                                          fromlist=(), level=0):
+                        if name != "target_module":
+                            return _real_import(name, globals, locals, fromlist, level)
                         token = len(calls) + 1
                         importer = None if globals is None else globals.get("__name__")
                         calls.append([token, importer])
                         return types.SimpleNamespace(Type=f"type-{token}")
 
-                    local_builtins = dict(vars(builtins))
-                    local_builtins["__import__"] = recording_import
-                    __builtins__ = local_builtins
-
+                    builtins.__import__ = recording_import
                     lazy import target_module as target
 
                     class C:
