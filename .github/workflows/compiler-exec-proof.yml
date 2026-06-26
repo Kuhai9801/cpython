@@ -1,0 +1,58 @@
+name: CPython compiler/execution proof
+
+on:
+  push:
+    branches:
+      - ci/compiler-exec-proof
+    paths:
+      - ".github/workflows/compiler-exec-proof.yml"
+      - "Tools/compiler_exec_proofs/**"
+  workflow_dispatch:
+    inputs:
+      case_filter:
+        description: "Optional substring filter for generated case names"
+        default: ""
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  tier2-compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout CPython fork branch
+        uses: actions/checkout@v4
+
+      - name: Record checkout
+        run: |
+          git rev-parse HEAD
+          git status --short
+
+      - name: Install CPython build dependencies
+        run: sudo bash .github/workflows/posix-deps-apt.sh
+
+      - name: Configure CPython with tier-2 interpreter
+        run: ./configure --enable-experimental-jit=interpreter --with-pydebug
+
+      - name: Build CPython
+        run: make -j4
+
+      - name: Runtime info
+        run: |
+          ./python -VV
+          ./python - <<'PY'
+          import _opcode
+          import os
+          import sys
+          print("sys._jit.available", sys._jit.is_available())
+          print("sys._jit.enabled", sys._jit.is_enabled())
+          print("specialization", _opcode.ENABLE_SPECIALIZATION)
+          print("PYTHON_JIT", os.environ.get("PYTHON_JIT"))
+          PY
+
+      - name: Compare compiler/runtime modes
+        env:
+          CASE_FILTER: ${{ github.event_name == 'workflow_dispatch' && inputs.case_filter || '' }}
+        run: ./python Tools/compiler_exec_proofs/mode_compare.py
