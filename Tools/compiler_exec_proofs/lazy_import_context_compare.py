@@ -363,20 +363,18 @@ CASES: list[Case] = [
                         file.write(textwrap.dedent(contents).lstrip())
 
                 sys.path.insert(0, tmpdir)
+                lazy import failpkg.bad
+                import failpkg
                 try:
-                    lazy import failpkg.bad
-                    import failpkg
-                    try:
-                        failpkg.bad
-                    except BaseException as exc:
-                        result = {
-                            "error": type(exc).__name__,
-                            "message": str(exc),
-                        }
-                    else:
-                        result = {"error": None, "message": "no exception"}
-                finally:
-                    sys.path.remove(tmpdir)
+                    failpkg.bad
+                except BaseException as exc:
+                    result = {
+                        "error": type(exc).__name__,
+                        "message": str(exc),
+                    }
+                else:
+                    result = {"error": None, "message": "no exception"}
+                sys.path.remove(tmpdir)
 
             print(json.dumps({"result": result}, sort_keys=True))
             """
