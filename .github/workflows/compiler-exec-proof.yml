@@ -65,6 +65,9 @@ jobs:
       - name: Run trace injection catchability suite
         run: ./python Tools/compiler_exec_proofs/trace_injection_compare.py
 
+      - name: Run cleanup interrupt suite
+        run: ./python Tools/compiler_exec_proofs/cleanup_interrupt_compare.py
+
       - name: Run focused compiler/runtime regression tests
         run: >
           ./python -m test -j2
