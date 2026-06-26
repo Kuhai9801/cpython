@@ -337,6 +337,49 @@ CASES: list[Case] = [
             "calls": [[1, "annpkg.mod"]],
         },
     ),
+    Case(
+        "lazy_pending_submodule_attribute_propagates_import_failure",
+        _body(
+            """
+            import json
+            import os
+            import sys
+            import tempfile
+            import textwrap
+
+            files = {
+                "failpkg/__init__.py": "",
+                "failpkg/bad.py": 'raise RuntimeError("bad submodule import")\\n',
+            }
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for relpath, contents in files.items():
+                    path = os.path.join(tmpdir, relpath)
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    with open(path, "w", encoding="utf-8") as file:
+                        file.write(textwrap.dedent(contents).lstrip())
+
+                sys.path.insert(0, tmpdir)
+                try:
+                    lazy import failpkg.bad
+                    import failpkg
+                    try:
+                        failpkg.bad
+                    except BaseException as exc:
+                        result = {
+                            "error": type(exc).__name__,
+                            "message": str(exc),
+                        }
+                    else:
+                        result = {"error": None, "message": "no exception"}
+                finally:
+                    sys.path.remove(tmpdir)
+
+            print(json.dumps({"result": result}, sort_keys=True))
+            """
+        ),
+        {"error": "RuntimeError", "message": "bad submodule import"},
+    ),
 ]
 
 
