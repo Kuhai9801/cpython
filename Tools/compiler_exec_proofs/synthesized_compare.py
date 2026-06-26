@@ -106,6 +106,31 @@ CASES: list[Case] = [
         ),
     ),
     Case(
+        "global_shadow_super_after_load_super_attr_warmup",
+        _body(
+            f"""
+            class A:
+                def m(self):
+                    return "base"
+
+            class C(A):
+                def f(self):
+                    return super().m()
+
+            class Proxy:
+                def m(self):
+                    return "proxy"
+
+            c = C()
+            for _ in range({WARMUP}):
+                c.f()
+
+            super = lambda *args: Proxy()
+            print(json.dumps({{"result": [c.f() for _ in range(8)]}}))
+            """
+        ),
+    ),
+    Case(
         "staticmethod_replacement_after_class_call_warmup",
         _body(
             f"""
